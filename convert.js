@@ -68,7 +68,7 @@ function convert($inPath, $outPath) {
           }
           $item['val1'] = $line[3];
           $item['val2'] = $line[4];
-          $metChanges.push({'sec':$item['sec'],'res':1920 * $line[4] / $line[3]});
+          $metChanges.push({'sec':$item['sec'],'res':1920 * $line[3] / $line[4]});
           $metChanges = $metChanges.sort(($a, $b) => ($a['sec'] - $b['sec']));
           break;
         }
