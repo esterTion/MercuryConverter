@@ -16,7 +16,7 @@ node convert.js [-w] <chart-file.txt> <convert-to.mer>
 
 ## format
 
-See [this article](about:blank) (Chinese)
+See [this article](https://www.bilibili.com/read/cv13419621) (Chinese)
 
 ## example chart
 
