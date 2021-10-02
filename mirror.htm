@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<div><label>
+  <span>mirror point</span>
+  <input type="text" id="mirror_point" value="15">
+</label></div>
+<div><label>
+  <span>lane</span>
+  <input type="text" id="lane">
+</label></div>
+<div><label>
+  <span>width</span>
+  <input type="text" id="width">
+</label></div>
+<div id="output"></div>
+
+<p>
+<div>
+  <textarea id="paste"></textarea>
+</div>
+<div id="output_paste" style="white-space:pre-wrap"></div>
+</p>
+<script>
+  function getMirrorLane(l, w) {
+    let mp = parseInt(mirror_point.value)
+    let nl = mp-((l+w/2)-mp)-w/2
+    nl += 120
+    nl %= 60
+    return nl
+  }
+  lane.addEventListener('input', e => {
+    let l = parseInt(lane.value)
+    let w = parseInt(width.value)
+    output.textContent = getMirrorLane(l, w)
+  })
+  paste.addEventListener('input', e => {
+    output_paste.textContent = paste.value.split('\n').map(line => {
+      if (!line.trim()) return line
+      line = line.split('\t')
+      let l = parseInt(line[3])
+      let w = parseInt(line[4])
+      line[3] = getMirrorLane(l, w)
+      if (line[2] === 'h') {
+        for (let i=5; i<line.length; i++) {
+          let holdParam = line[i].split(',')
+          l = parseInt(holdParam[2])
+          w = parseInt(holdParam[3])
+          holdParam[2] = getMirrorLane(l, w)
+          line[i] = holdParam.join(',')
+        }
+      }
+      return line.join('\t')
+    }).join('\n')
+  })
+</script>
