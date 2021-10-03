@@ -12,9 +12,9 @@ function main() {
     }
     if (argv.length < i + 2) {
       console.log(`node convert.js [-w] <chart-file.txt> <convert-to.mer>`)
-      console.log('\t-w                   keep watching without exiting')
-      console.log('\t<chart-file.txt>     source chart file')
-      console.log('\t<convert-to.mer>     destination mer file')
+      console.log('\t-w                   Keep watching without exiting')
+      console.log('\t<chart-file.txt>     Source chart file')
+      console.log('\t<convert-to.mer>     Destination mer file')
       process.exit()
     }
     src = argv[i++]
@@ -26,20 +26,21 @@ function main() {
   }
 
   if (!fs.existsSync(src)) {
-    console.log(`file ${src} does not exist`)
+    console.log(`File ${src} does not exist`)
     process.exit()
   }
   if (watch) {
+    console.log("* Entering watch mode, use Ctrl+C to exit *")
     let lastm = 0
     setInterval(() => {
       let m = fs.statSync(src).mtimeMs
       if (m !== lastm) {
         lastm = m
-        console.log(`detected modification of ${(new Date(lastm)).toString()} ${lastm}`)
+        console.log(`Detected modification of ${(new Date(lastm)).toString()} ${lastm}`)
         try {
           convert(src, dest)
         } catch (e) {
-          console.error('error while converting:', e)
+          console.error('**** Error while converting:', e)
         }
       }
     }, 300)
@@ -51,7 +52,7 @@ function convert($inPath, $outPath) {
   let $inData = fs.readFileSync($inPath, {encoding: 'UTF-8'});
   if ($inData.substr(0, 13) !== '#MercuryChart') {
     // force header check
-    console.log('invalid chart file, please put "#MercuryChart" at the beginning')
+    console.log('Invalid chart file, please put "#MercuryChart" at the beginning')
     process.exit()
   }
   $inData = $inData.replace(/ +/, '\t')
