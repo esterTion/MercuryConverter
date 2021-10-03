@@ -29,7 +29,23 @@ function main() {
     console.log(`file ${src} does not exist`)
     process.exit()
   }
-  convert(src, dest);
+  if (watch) {
+    let lastm = 0
+    setInterval(() => {
+      let m = fs.statSync(src).mtimeMs
+      if (m !== lastm) {
+        lastm = m
+        console.log(`detected modification of ${(new Date(lastm)).toString()} ${lastm}`)
+        try {
+          convert(src, dest)
+        } catch (e) {
+          console.error('error while converting:', e)
+        }
+      }
+    }, 300)
+  } else {
+    convert(src, dest);
+  }
 }
 function convert($inPath, $outPath) {
   let $inData = fs.readFileSync($inPath, {encoding: 'UTF-8'});
