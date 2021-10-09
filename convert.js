@@ -135,28 +135,62 @@ function convert($inPath, $outPath) {
         let $hold = [{'pos':$item['sec'] *1920 + $item['pos'], 'lane':parseInt($item['lane']), 'width':parseInt($item['width'])}];
         for (let $holdParamI=5; $holdParamI<$line.length; $holdParamI++) {
           $holdParam = $line[$holdParamI].split(',');
-          $hold.push({'pos':$holdParam[0] *1920 + positionConvert($holdParam[1], $holdParam[0], $metChanges), 'lane':parseInt($holdParam[2]), 'width':parseInt($holdParam[3])});
+          $curve = 0
+          if ($holdParam[4]) {
+            $curve = {'ci':1,'co':2,'cri':3,'cro':4}[$holdParam[4]] || 0
+          }
+          $hold.push({'pos':$holdParam[0] *1920 + positionConvert($holdParam[1], $holdParam[0], $metChanges), 'lane':parseInt($holdParam[2]), 'width':parseInt($holdParam[3]), 'curve':$curve});
         }
         for (let $holdI=0; $holdI < $hold.length - 1; $holdI++) {
           let $prevHold = $hold[$holdI];
           let $nextHold = $hold[$holdI + 1];
           let $laneDiff = $nextHold['lane'] - $prevHold['lane'];
           let $widthDiff = $nextHold['width'] - $prevHold['width'];
-          let $step = Math.max(Math.abs($laneDiff), Math.abs($widthDiff));
-          for (let $stepI=1; $stepI<$step; $stepI++) {
-            $item = {};
-            let $pos = Math.round($prevHold['pos'] + ($nextHold['pos'] - $prevHold['pos']) / $step * $stepI);
-            let $lane = Math.round($prevHold['lane'] + ($nextHold['lane'] - $prevHold['lane']) / $step * $stepI);
-            let $width = Math.round($prevHold['width'] + ($nextHold['width'] - $prevHold['width']) / $step * $stepI);
-            $item['sec'] = Math.floor($pos / 1920);
-            $item['pos'] = $pos % 1920;
-            $item['type'] = 1;
-            $item['noteType'] = 10;
-            $item['lane'] = $lane;
-            $item['width'] = $width;
-            $item['holdId'] = $holdId;
-            $item['node'] = 0;
-            $notes.push($item);
+          if ($nextHold['curve']) {
+            let $controlPoint
+            switch ($nextHold['curve']) {
+              case 1: { $controlPoint = [0.5, $nextHold['lane'], $nextHold['width']]; break; } // curve in
+              case 2: { $controlPoint = [0.5, $prevHold['lane'], $prevHold['width']]; break; } // curve out
+              case 3: { $controlPoint = [0,   $nextHold['lane'], $nextHold['width']]; break; } // curve rapid in
+              case 4: { $controlPoint = [1,   $prevHold['lane'], $prevHold['width']]; break; } // curve rapid out
+            }
+            let $laneSteps = getCurvePoints($controlPoint, [$prevHold['lane'], $prevHold['width']], [$nextHold['lane'], $nextHold['width']])
+            for (let $stepI=0; $stepI<$laneSteps.length; $stepI++) {
+              $item = {};
+              let $pos = Math.round($prevHold['pos'] + ($nextHold['pos'] - $prevHold['pos']) * $laneSteps[$stepI][0]);
+              let $lane = $laneSteps[$stepI][1];
+              let $width = $laneSteps[$stepI][2];
+              let $isNode = 1;
+              if ($widthDiff && $stepI > 0 && $laneSteps[$stepI][2] === $laneSteps[$stepI-1][2]) {
+                $isNode = 0;
+              }
+              $item['sec'] = Math.floor($pos / 1920);
+              $item['pos'] = $pos % 1920;
+              $item['type'] = 1;
+              $item['noteType'] = 10;
+              $item['lane'] = $lane;
+              $item['width'] = $width;
+              $item['holdId'] = $holdId;
+              $item['node'] = $isNode;
+              $notes.push($item);
+            }
+          } else {
+            let $step = Math.max(Math.abs($laneDiff), Math.abs($widthDiff));
+            for (let $stepI=1; $stepI<$step; $stepI++) {
+              $item = {};
+              let $pos = Math.round($prevHold['pos'] + ($nextHold['pos'] - $prevHold['pos']) / $step * $stepI);
+              let $lane = Math.round($prevHold['lane'] + ($nextHold['lane'] - $prevHold['lane']) / $step * $stepI);
+              let $width = Math.round($prevHold['width'] + ($nextHold['width'] - $prevHold['width']) / $step * $stepI);
+              $item['sec'] = Math.floor($pos / 1920);
+              $item['pos'] = $pos % 1920;
+              $item['type'] = 1;
+              $item['noteType'] = 10;
+              $item['lane'] = $lane;
+              $item['width'] = $width;
+              $item['holdId'] = $holdId;
+              $item['node'] = 0;
+              $notes.push($item);
+            }
           }
           {
             $item = {};
@@ -270,6 +304,51 @@ function positionConvert($custom = '', $section, $metChanges) {
     throw new Error('bad position '.$custom);
   }
   return $sectionScaleResolution * $sectionScaleResolution / $sectionResolution * $customSep[0] / $customSep[1];
+}
+
+function getCurvePoints(p2, from, to) {
+  let p1 = [0, from[0]], p3 = [1, to[0]]
+  const maxDepth = 5
+  const formula = (p1, p2, p3, t) => ((1-t)*(1-t)*p1 + 2*(1-t)*t*p2 + t*t*p3)
+  let calcPoints = [[0, [0,0,from[0]],[1,1,to[0]]]]
+  let i=0
+  while (i < calcPoints.length) {
+    while (i < calcPoints.length && calcPoints[i][0] < maxDepth) {
+      let section = calcPoints.splice(i, 1)[0]
+      let middlet = (section[1][0] + section[2][0]) / 2
+      let middle = [
+        middlet,
+        formula(p1[0], p2[0], p3[0], middlet),
+        formula(p1[1], p2[1], p3[1], middlet),
+      ]
+      if (Math.floor(section[1][2]) !== Math.floor(middle[2])) calcPoints.push([
+        section[0] + 1,
+        section[1],
+        middle
+      ])
+      if (Math.floor(section[2][2]) !== Math.floor(middle[2])) calcPoints.push([
+        section[0] + 1,
+        middle,
+        section[2]
+      ])
+    }
+    i++
+  }
+  calcPoints = calcPoints.map(section => {
+    let y = Math.floor(Math.max(section[1][2], section[2][2]))
+    if (y === section[1][2]) {
+      return [ section[1][1], section[1][2], Math.round(formula(from[1], p2[2], to[1], section[1][0])) ]
+    } else if (y === section[2][2]) {
+      return [ section[2][1], section[2][2], Math.round(formula(from[1], p2[2], to[1], section[2][0])) ]
+    } else {
+      return [
+        (y - section[2][2]) / (section[1][2] - section[2][2]) * (section[1][1] - section[2][1]) + section[2][1],
+        y,
+        Math.round(formula(from[1], p2[2], to[1], (y - section[2][2]) / (section[1][2] - section[2][2]) * (section[1][0] - section[2][0]) + section[2][0]))
+      ]
+    }
+  }).filter(p => p[1] !== from && p[1] !== to)
+  return calcPoints
 }
 
 main()

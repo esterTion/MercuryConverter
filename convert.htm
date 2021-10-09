@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8" name="viewport" content="width=device-width">
+<title>MercuryConverter 在线版</title>
+<script>
+    window.fs = {
+        buf: '',
+        readFileSync: function() { return window.fs.buf },
+        writeFileSync: function (p, d) {window.fs.buf = d}
+    }
+    window.require = function () {return window.fs}
+    window.process = {exit:function(){ throw new Error('not error')}, argv:[]}
+    window.logs = []
+    window.console.log = function (log) {
+        logs.push(log)
+    }
+</script>
+<script src="convert.js"></script>
+</head>
+<body>
+    <p>
+        <div>谱面文件：</div>
+        <div><input type="file" accept=".txt" id="chart"></div>
+    </p>
+    <p id="log_view" style="white-space:pre-wrap"></p>
+    <script>
+chart.addEventListener('change', function () {
+    readFileAndConvert(chart.files[0])
+})
+logs=[]
+/**
+ * @param file {File}
+ */
+function readFileAndConvert(file) {
+    let fname = file.name
+    const reader = new FileReader()
+    reader.readAsText(file, 'UTF-8')
+    reader.onload = () => {
+        let input = reader.result
+        window.fs.buf = input
+        try {
+            convert('', '')
+        } catch(_) {}
+        if (window.fs.buf !== input) {
+            console.log('转换完成')
+            log_view.textContent = logs.join('\n')
+            const blob = new Blob([window.fs.buf], {mimeType:'text/plain'})
+            const bloburl = URL.createObjectURL(blob)
+            const anchor = document.createElement('a')
+            anchor.href = bloburl
+            anchor.download = fname + '.mer'
+            anchor.click()
+        } else {
+            console.log('转换失败')
+            log_view.textContent = logs.join('\n')
+        }
+    }
+}
+document.body.parentElement.addEventListener('drop', function (e) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.files.length) {
+        readFileAndConvert(e.dataTransfer.files[0])
+    }
+})
+    </script>
+</body>
