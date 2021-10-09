@@ -146,23 +146,35 @@ function convert($inPath, $outPath) {
           let $nextHold = $hold[$holdI + 1];
           let $laneDiff = $nextHold['lane'] - $prevHold['lane'];
           let $widthDiff = $nextHold['width'] - $prevHold['width'];
+          let $fixPos = []
           if ($nextHold['curve']) {
             let $controlPoint
+            let $swapRef = Math.abs($laneDiff) < Math.abs($widthDiff)
             switch ($nextHold['curve']) {
               case 1: { $controlPoint = [0.5, $nextHold['lane'], $nextHold['width']]; break; } // curve in
               case 2: { $controlPoint = [0.5, $prevHold['lane'], $prevHold['width']]; break; } // curve out
-              case 3: { $controlPoint = [0,   $nextHold['lane'], $nextHold['width']]; break; } // curve rapid in
-              case 4: { $controlPoint = [1,   $prevHold['lane'], $prevHold['width']]; break; } // curve rapid out
+              case 3: { $controlPoint = [0.1,   $nextHold['lane'], $nextHold['width']]; break; } // curve rapid in
+              case 4: { $controlPoint = [0.9,   $prevHold['lane'], $prevHold['width']]; break; } // curve rapid out
             }
-            let $laneSteps = getCurvePoints($controlPoint, [$prevHold['lane'], $prevHold['width']], [$nextHold['lane'], $nextHold['width']])
+            let $startPos = [$prevHold['lane'], $prevHold['width']]
+            let $endPos = [$nextHold['lane'], $nextHold['width']]
+            if ($swapRef) {
+              $controlPoint = [$controlPoint[0], $controlPoint[2], $controlPoint[1]]
+              $startPos = [$startPos[1], $startPos[0]]
+              $endPos = [$endPos[1], $endPos[0]]
+            }
+            let $laneSteps = getCurvePoints($controlPoint, $startPos, $endPos)
             for (let $stepI=0; $stepI<$laneSteps.length; $stepI++) {
               $item = {};
               let $pos = Math.round($prevHold['pos'] + ($nextHold['pos'] - $prevHold['pos']) * $laneSteps[$stepI][0]);
               let $lane = $laneSteps[$stepI][1];
               let $width = $laneSteps[$stepI][2];
               let $isNode = 1;
-              if ($widthDiff && $stepI > 0 && $laneSteps[$stepI][2] === $laneSteps[$stepI-1][2]) {
+              if ((($swapRef&&$laneDiff) || (!$swapRef&&$widthDiff)) && $stepI > 0 && $laneSteps[$stepI][2] === $laneSteps[$stepI-1][2]) {
                 $isNode = 0;
+              }
+              if ($swapRef) {
+                [$width, $lane] = [$lane, $width]
               }
               $item['sec'] = Math.floor($pos / 1920);
               $item['pos'] = $pos % 1920;
@@ -173,6 +185,7 @@ function convert($inPath, $outPath) {
               $item['holdId'] = $holdId;
               $item['node'] = $isNode;
               $notes.push($item);
+              $fixPos.push($item);
             }
           } else {
             let $step = Math.max(Math.abs($laneDiff), Math.abs($widthDiff));
@@ -190,6 +203,29 @@ function convert($inPath, $outPath) {
               $item['holdId'] = $holdId;
               $item['node'] = 0;
               $notes.push($item);
+              $fixPos.push($item);
+            }
+          }
+          {
+            let $lastPos = $prevHold['pos']
+            for ($fixPosI=0; $fixPosI<$fixPos.length; $fixPosI++) {
+              let $pos = $fixPos[$fixPosI]['sec'] * 1920 + $fixPos[$fixPosI]['pos']
+              if ($pos <= $lastPos) {
+                $pos = $lastPos + 1
+                $fixPos[$fixPosI]['sec'] = Math.floor($pos / 1920);
+                $fixPos[$fixPosI]['pos'] = $pos % 1920;
+              }
+              $lastPos = $pos
+            }
+            $lastPos = $nextHold['pos']
+            for ($fixPosI=$fixPos.length-1; $fixPosI>=0; $fixPosI--) {
+              let $pos = $fixPos[$fixPosI]['sec'] * 1920 + $fixPos[$fixPosI]['pos']
+              if ($pos >= $lastPos) {
+                $pos = $lastPos - 1
+                $fixPos[$fixPosI]['sec'] = Math.floor($pos / 1920);
+                $fixPos[$fixPosI]['pos'] = $pos % 1920;
+              }
+              $lastPos = $pos
             }
           }
           {
@@ -347,7 +383,7 @@ function getCurvePoints(p2, from, to) {
         Math.round(formula(from[1], p2[2], to[1], (y - section[2][2]) / (section[1][2] - section[2][2]) * (section[1][0] - section[2][0]) + section[2][0]))
       ]
     }
-  }).filter(p => p[1] !== from && p[1] !== to)
+  }).filter(p => p[1] !== from[0] && p[1] !== to[0])
   return calcPoints
 }
 
