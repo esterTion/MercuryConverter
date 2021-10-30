@@ -337,7 +337,7 @@ function positionConvert($custom = '', $section, $metChanges) {
   }
   let $customSep = $custom.split('/');
   if ($customSep.length != 2) {
-    throw new Error('bad position '.$custom);
+    throw new Error('bad position '+$custom);
   }
   return $sectionScaleResolution * $sectionScaleResolution / $sectionResolution * $customSep[0] / $customSep[1];
 }

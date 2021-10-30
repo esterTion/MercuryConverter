@@ -40,7 +40,9 @@ function readFileAndConvert(file) {
         window.fs.buf = input
         try {
             convert('', '')
-        } catch(_) {}
+        } catch(e) {
+        	console.error(e)
+        }
         if (window.fs.buf !== input) {
             console.log('转换完成')
             log_view.textContent = logs.join('\n')
