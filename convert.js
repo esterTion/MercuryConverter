@@ -55,7 +55,7 @@ function convert($inPath, $outPath) {
     console.log('Invalid chart file, please put "#MercuryChart" at the beginning')
     process.exit()
   }
-  $inData = $inData.replace(/ +/, '\t')
+  $inData = $inData.replace(/ +/g, '\t')
   let $inLines = $inData.split('\n');
   let $headers = [];
   let $noteHeaders = [];
